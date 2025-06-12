@@ -138,9 +138,9 @@ public class Main extends JFrame {
                 "1. Dodaj wpis",
                 "2. Usuń wpis",
                 "3. Popraw wpis",
-                "4. Wyświetl wpis",
-                "5. Wyświetl całą książkę",
-                "6. Wyszukaj"
+                "4. Wyświetl całą książkę",
+                "5. Wyszukaj",
+                "← Zmień bazę danych"
         };
 
         for (int i = 0; i < labels.length; i++) {
@@ -151,20 +151,15 @@ public class Main extends JFrame {
                     case 1 -> cardLayout.show(mainPanel, "dodaj wpis");
                     case 2 -> pokazUsunWpisPanel();
                     case 3 -> pokazPoprawWpisPanel();
-                    case 4 -> wyswietlCalaKsiazkePanel();
+                    case 4 -> pokazWyswietlCalaKsiazkePanel();
+                    case 5 -> pokazWyszukajPanel();
+                    case 6 -> {bazaDanych = null; pokazStartPanel();}
                     default -> JOptionPane.showMessageDialog(this, "Opcja jeszcze nie zaimplementowana.");
                 }
             });
             panel.add(button);
         }
 
-        JButton zmienBazeBtn = new JButton("← Zmień bazę danych");
-        zmienBazeBtn.addActionListener(e -> {
-            bazaDanych = null;
-            pokazStartPanel();
-        });
-
-        panel.add(zmienBazeBtn);
         return panel;
     }
 
@@ -427,28 +422,140 @@ public class Main extends JFrame {
 
     private JPanel wyswietlCalaKsiazkePanel() {
         JPanel panel = new JPanel(new BorderLayout());
+
+        // Dane do tabeli
+        String[] kolumny = {"Nazwa", "Miejscowość", "Numery"};
+        ArrayList<Map<String, Object>> data = bazaDanych.read();
+
+        String[][] rows = new String[data.size()][3];
+
+        for (int i = 0; i < data.size(); i++) {
+            Map<String, Object> kontakt = data.get(i);
+
+            rows[i][0] = kontakt.get("nazwa").toString();
+            rows[i][1] = kontakt.get("miejscowosc").toString();
+            String numeryStr = kontakt.get("numery").toString();
+            numeryStr = numeryStr.substring(1, numeryStr.length() - 1); // usuwa pierwsze i ostatnie znaki '[' i ']'
+            rows[i][2] = numeryStr;
+        }
+
+        JTable tabela = new JTable(rows, kolumny);
+        JScrollPane scrollPane = new JScrollPane(tabela);
+        panel.add(scrollPane, BorderLayout.CENTER);
+
+        JButton wroc = new JButton("← Wróć");
+        wroc.addActionListener(e -> cardLayout.show(mainPanel, "menu"));
+        panel.add(wroc, BorderLayout.SOUTH);
+
+        return panel;
+    }
+
+    private JPanel wyszukajPanel() {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+
+        JPanel inputPanel = new JPanel(new FlowLayout());
+        JTextField szukajField = new JTextField(20);
+
+        inputPanel.add(new JLabel("Wyszukaj:"));
+        inputPanel.add(szukajField);
+
+        DefaultListModel<String> model = new DefaultListModel<>();
+        JList<String> wynikiList = new JList<>(model);
+        JScrollPane scrollPane = new JScrollPane(wynikiList);
+
+        panel.add(inputPanel, BorderLayout.NORTH);
+        panel.add(scrollPane, BorderLayout.CENTER);
+
+        // Funkcja do aktualizacji wyników
+        Runnable updateResults = () -> {
+            model.clear();
+            String query = szukajField.getText().toLowerCase().trim();
+
+            ArrayList<Map<String, Object>> data = bazaDanych.read();
+
+            for (Map<String, Object> kontakt : data) {
+                String nazwa = kontakt.get("nazwa").toString().toLowerCase();
+                String miejscowosc = kontakt.get("miejscowosc").toString().toLowerCase();
+                @SuppressWarnings("unchecked")
+                ArrayList<String> numery = (ArrayList<String>) kontakt.get("numery");
+
+                boolean pasuje;
+                if (query.isEmpty()) {
+                    pasuje = true; // puste pole - pokaz wszystko
+                } else {
+                    pasuje = nazwa.contains(query) || miejscowosc.contains(query);
+                    if (!pasuje) {
+                        for (String nr : numery) {
+                            if (nr.toLowerCase().contains(query)) {
+                                pasuje = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (pasuje) {
+                    String numeryTekst = String.join(", ", numery);
+                    // separator dwie spacje
+                    model.addElement(kontakt.get("nazwa") + "  " + kontakt.get("miejscowosc") + "  " + numeryTekst);
+                }
+            }
+
+            if (model.isEmpty()) {
+                model.addElement("Brak wyników.");
+            }
+        };
+
+        // Listener do dynamicznego filtrowania przy każdej zmianie tekstu
+        szukajField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { updateResults.run(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { updateResults.run(); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { updateResults.run(); }
+        });
+
+        // Pokaz wszystkie od razu po wczytaniu panelu
+        updateResults.run();
+
+        JButton wrocBtn = new JButton("Wróć");
+        wrocBtn.addActionListener(e -> cardLayout.show(mainPanel, "menu"));
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        buttonPanel.add(wrocBtn);
+        panel.add(buttonPanel, BorderLayout.SOUTH);
+
         return panel;
     }
 
     private void pokazStartPanel() {
-        JPanel nowyStartPanel = startPanel();  // generuj nowy panel z aktualnymi plikami
+        JPanel nowyStartPanel = startPanel();
         mainPanel.add(nowyStartPanel, "start");
         cardLayout.show(mainPanel, "start");
     }
     private void pokazUsunWpisPanel() {
-        JPanel nowyStartPanel = usunWpisPanel();  // generuj nowy panel z aktualnymi plikami
+        JPanel nowyStartPanel = usunWpisPanel();
         mainPanel.add(nowyStartPanel, "usun wpis");
         cardLayout.show(mainPanel, "usun wpis");
     }
     private void pokazPoprawWpisPanel() {
-        JPanel nowyStartPanel = poprawWpisPanel();  // generuj nowy panel z aktualnymi plikami
+        JPanel nowyStartPanel = poprawWpisPanel();
         mainPanel.add(nowyStartPanel, "popraw wpis");
         cardLayout.show(mainPanel, "popraw wpis");
     }
     private void pokazPoprawWybranyWpisPanel(int id) {
-        JPanel nowyStartPanel = poprawWybranyWpisPanel(id);  // generuj nowy panel z aktualnymi plikami
+        JPanel nowyStartPanel = poprawWybranyWpisPanel(id);
         mainPanel.add(nowyStartPanel, "popraw wybrany wpis");
         cardLayout.show(mainPanel, "popraw wybrany wpis");
+    }
+
+    private void pokazWyswietlCalaKsiazkePanel() {
+        JPanel nowyStartPanel = wyswietlCalaKsiazkePanel();
+        mainPanel.add(nowyStartPanel, "wyswietl cala ksiazke");
+        cardLayout.show(mainPanel, "wyswietl cala ksiazke");
+    }
+    private void pokazWyszukajPanel() {
+        JPanel nowyStartPanel = wyszukajPanel();
+        mainPanel.add(nowyStartPanel, "wyszukaj ksiazke");
+        cardLayout.show(mainPanel, "wyszukaj ksiazke");
     }
 
     public static void main(String[] args) {
