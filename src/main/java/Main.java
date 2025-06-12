@@ -6,6 +6,7 @@ import java.awt.event.MouseEvent;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Map;
+import com.formdev.flatlaf.FlatDarkLaf;
 
 public class Main extends JFrame {
     private CardLayout cardLayout;
@@ -205,10 +206,18 @@ public class Main extends JFrame {
 
             JOptionPane.showMessageDialog(this, "Kontakt zapisany.");
             cardLayout.show(mainPanel, "menu");
+            nazwaField.setText("");
+            miejscowoscField.setText("");
+            numeryArea.setText("");
         });
 
         JButton wrocButton = new JButton("Wróć");
-        wrocButton.addActionListener(e -> cardLayout.show(mainPanel, "menu"));
+        wrocButton.addActionListener(e -> {
+            cardLayout.show(mainPanel, "menu");
+            nazwaField.setText("");
+            miejscowoscField.setText("");
+            numeryArea.setText("");
+        });
 
         buttonPanel.add(zapiszButton);
         buttonPanel.add(wrocButton);
@@ -559,6 +568,12 @@ public class Main extends JFrame {
     }
 
     public static void main(String[] args) {
+        try {
+            UIManager.setLookAndFeel(new FlatDarkLaf());
+        }
+        catch (Exception ex) {
+            ex.printStackTrace();
+        }
         SwingUtilities.invokeLater(Main::new);
     }
 }
