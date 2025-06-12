@@ -1,6 +1,8 @@
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Map;
@@ -26,7 +28,7 @@ public class Main extends JFrame {
 
         mainPanel.add(startPanel(), "start");
         mainPanel.add(menuPanel(), "menu");
-        mainPanel.add(dodajPanel(), "dodaj");
+        mainPanel.add(dodajWpisPanel(), "dodaj wpis");
 
         add(mainPanel);
         cardLayout.show(mainPanel, "start");
@@ -84,23 +86,22 @@ public class Main extends JFrame {
             String wybrane = list.getSelectedValue();
             File wybranyPlik = null;
 
-            for (File plik : pliki) {
-                if (plik.getName().toLowerCase().contains(wybrane.toLowerCase())) {
-                    wybranyPlik = plik;
-                    break; // pierwszy pasujący
+            if(pliki != null) {
+                for (File plik : pliki) {
+                    if (plik.getName().toLowerCase().contains(wybrane.toLowerCase())) {
+                        wybranyPlik = plik;
+                        break; // pierwszy pasujący
+                    }
                 }
             }
 
-            System.out.println(wybrane);
-            System.out.println(wybranyPlik);
-
             int confirm = JOptionPane.showConfirmDialog(this,
-                    "Czy na pewno chcesz baze danych: " + wybrane.replaceFirst("\\.json$", "") + "?",
+                    "Czy na pewno chcesz usunąć baze danych: " + wybrane.replaceFirst("\\.json$", "") + "?",
                     "Potwierdź usunięcie", JOptionPane.YES_NO_OPTION);
             if (confirm == JOptionPane.YES_OPTION) {
                 if (wybranyPlik.delete()) {
                     JOptionPane.showMessageDialog(this, "Baza została usunięta.");
-                    odswiezStartPanel();
+                    pokazStartPanel();
                 }
             }
         });
@@ -109,6 +110,24 @@ public class Main extends JFrame {
         buttons.add(nowa);
         buttons.add(usunBtn);
         panel.add(buttons, BorderLayout.SOUTH);
+
+        list.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) {
+                int index = list.locationToIndex(e.getPoint());
+
+                if (index != -1) {
+                    if (e.getClickCount() == 2) {
+                        String wybrane = list.getSelectedValue();
+                        if (wybrane != null) {
+                            bazaDanych = new BazaDanych(folderBaz + "/" + wybrane);
+                            cardLayout.show(mainPanel, "menu");
+                        }
+                    }
+                }
+                else
+                    list.clearSelection();
+            }
+        });
 
         return panel;
     }
@@ -129,7 +148,10 @@ public class Main extends JFrame {
             JButton button = new JButton(labels[i]);
             button.addActionListener(e -> {
                 switch (opcja) {
-                    case 1 -> cardLayout.show(mainPanel, "dodaj");
+                    case 1 -> cardLayout.show(mainPanel, "dodaj wpis");
+                    case 2 -> pokazUsunWpisPanel();
+                    case 3 -> pokazPoprawWpisPanel();
+                    case 4 -> wyswietlCalaKsiazkePanel();
                     default -> JOptionPane.showMessageDialog(this, "Opcja jeszcze nie zaimplementowana.");
                 }
             });
@@ -139,14 +161,14 @@ public class Main extends JFrame {
         JButton zmienBazeBtn = new JButton("← Zmień bazę danych");
         zmienBazeBtn.addActionListener(e -> {
             bazaDanych = null;
-            odswiezStartPanel();
+            pokazStartPanel();
         });
 
         panel.add(zmienBazeBtn);
         return panel;
     }
 
-    private JPanel dodajPanel() {
+    private JPanel dodajWpisPanel() {
         JPanel panel = new JPanel(new BorderLayout());
 
         JPanel inputPanel = new JPanel(new GridLayout(0, 2, 5, 5));
@@ -200,10 +222,233 @@ public class Main extends JFrame {
         return panel;
     }
 
-    private void odswiezStartPanel() {
+    private JPanel usunWpisPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+
+        JPanel inputPanel = new JPanel();
+
+        panel.add(inputPanel, BorderLayout.CENTER);
+
+        DefaultListModel<String> model = new DefaultListModel<>();
+        JList<String> list = new JList<>(model);
+        JScrollPane scrollPane = new JScrollPane(list);
+
+        ArrayList<Map<String, Object>> data = bazaDanych.read();
+
+        for(Map<String, Object> kontakt : data) {
+            ArrayList<String> numeryList = (ArrayList<String>) kontakt.get("numery");
+            String numery = String.join(" ", numeryList);
+            model.addElement(
+                    kontakt.get("nazwa").toString() + "   " +
+                    kontakt.get("miejscowosc").toString() + "   " +
+                    numery
+            );
+        }
+
+        panel.add(scrollPane, BorderLayout.CENTER);
+
+        JPanel buttonPanel = new JPanel();
+
+        JButton wrocButton = new JButton("Wróć");
+        wrocButton.addActionListener(e -> cardLayout.show(mainPanel, "menu"));
+
+        JButton usunButton = new JButton("Usuń");
+        usunButton.addActionListener(e -> {
+            String wybrane = list.getSelectedValue();
+            int confirm = JOptionPane.showConfirmDialog(this,
+                    "Czy na pewno chcesz usunąć kontakt: " + wybrane.split(" ")[0] + "?",
+                    "Potwierdź usunięcie", JOptionPane.YES_NO_OPTION);
+            if (confirm == JOptionPane.YES_OPTION) {
+                data.remove(list.getSelectedIndex());
+                bazaDanych.write(data);
+                JOptionPane.showMessageDialog(this, "Kontakt został usunięty.");
+                cardLayout.show(mainPanel, "menu");
+            }
+        });
+
+        buttonPanel.add(usunButton);
+        buttonPanel.add(wrocButton);
+
+        panel.add(buttonPanel, BorderLayout.SOUTH);
+
+        list.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) {
+                int index = list.locationToIndex(e.getPoint());
+
+                if (index != -1) {
+                    if (e.getClickCount() == 2) {
+                        String wybrane = list.getSelectedValue();
+                        if (wybrane != null) {
+                            int confirm = JOptionPane.showConfirmDialog(Main.this,
+                                    "Czy na pewno chcesz usunąc kontakt: " + wybrane.split(" ")[0] + "?",
+                                    "Potwierdź usunięcie", JOptionPane.YES_NO_OPTION);
+                            if (confirm == JOptionPane.YES_OPTION) {
+                                data.remove(list.getSelectedIndex());
+                                bazaDanych.write(data);
+                                JOptionPane.showMessageDialog(Main.this, "Kontakt został usunięty.");
+                                cardLayout.show(mainPanel, "menu");
+                            }
+                        }
+                    }
+                }
+                else
+                    list.clearSelection();
+            }
+        });
+
+        return panel;
+    }
+
+    private JPanel poprawWpisPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+
+        JPanel inputPanel = new JPanel();
+
+        panel.add(inputPanel, BorderLayout.CENTER);
+
+        DefaultListModel<String> model = new DefaultListModel<>();
+        JList<String> list = new JList<>(model);
+        JScrollPane scrollPane = new JScrollPane(list);
+
+        ArrayList<Map<String, Object>> data = bazaDanych.read();
+
+        for(Map<String, Object> kontakt : data) {
+            ArrayList<String> numeryList = (ArrayList<String>) kontakt.get("numery");
+            String numery = String.join(" ", numeryList);
+            model.addElement(
+                    kontakt.get("nazwa").toString() + "   " +
+                            kontakt.get("miejscowosc").toString() + "   " +
+                            numery
+            );
+        }
+
+        panel.add(scrollPane, BorderLayout.CENTER);
+
+        JPanel buttonPanel = new JPanel();
+
+        JButton wrocButton = new JButton("Wróć");
+        wrocButton.addActionListener(e -> cardLayout.show(mainPanel, "menu"));
+
+        JButton poprawButton = new JButton("Popraw");
+        poprawButton.addActionListener(e -> {
+            int wybrane = list.getSelectedIndex();
+            pokazPoprawWybranyWpisPanel(wybrane);
+        });
+
+        buttonPanel.add(poprawButton);
+        buttonPanel.add(wrocButton);
+
+        panel.add(buttonPanel, BorderLayout.SOUTH);
+
+        list.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) {
+                int index = list.locationToIndex(e.getPoint());
+
+                if (index != -1) {
+                    if (e.getClickCount() == 2) {
+                        String wybrane = list.getSelectedValue();
+                        if (wybrane != null) {
+                            pokazPoprawWybranyWpisPanel(list.getSelectedIndex());
+                        }
+                    }
+                }
+                else
+                    list.clearSelection();
+            }
+        });
+
+        return panel;
+    }
+
+    private JPanel poprawWybranyWpisPanel(int id) {
+        ArrayList<Map<String, Object>> data = bazaDanych.read();
+        Map<String, Object> kontakt = data.get(id);
+        JPanel panel = new JPanel(new BorderLayout());
+
+        JPanel inputPanel = new JPanel(new GridLayout(0, 2, 5, 5));
+        JTextField nazwaField = new JTextField();
+        nazwaField.setText(kontakt.get("nazwa").toString());
+        JTextField miejscowoscField = new JTextField();
+        miejscowoscField.setText(kontakt.get("miejscowosc").toString());
+        JTextArea numeryArea = new JTextArea(5, 20);
+        Object numeryObj = kontakt.get("numery");
+        if (numeryObj instanceof java.util.List<?> numeryList) {
+            StringBuilder sb = new StringBuilder();
+            for (Object numer : numeryList) {
+                sb.append(numer.toString()).append("\n");
+            }
+            numeryArea.setText(sb.toString());
+        }
+
+        inputPanel.add(new JLabel("Nazwa:"));
+        inputPanel.add(nazwaField);
+        inputPanel.add(new JLabel("Miejscowość:"));
+        inputPanel.add(miejscowoscField);
+        inputPanel.add(new JLabel("Numery (jeden na linię):"));
+        inputPanel.add(new JScrollPane(numeryArea));
+
+        panel.add(inputPanel, BorderLayout.CENTER);
+
+        JPanel buttonPanel = new JPanel();
+
+        JButton zapiszButton = new JButton("Popraw");
+        zapiszButton.addActionListener((ActionEvent e) -> {
+            String nazwa = nazwaField.getText();
+            String miejscowosc = miejscowoscField.getText();
+            String[] numeryLines = numeryArea.getText().split("\\R");
+
+            ArrayList<String> numery = new ArrayList<>();
+            for (String s : numeryLines) {
+                if (!s.isBlank()) numery.add(s.trim());
+            }
+
+            if (nazwa.isEmpty() || miejscowosc.isEmpty() || numery.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Wszystkie pola muszą być wypełnione.");
+                return;
+            }
+
+            Kontakt nowyKontakt = new Kontakt(nazwa, miejscowosc, numery);
+            data.set(id, nowyKontakt.content );
+            bazaDanych.write(data);
+
+            JOptionPane.showMessageDialog(this, "Kontakt poprawiony.");
+            cardLayout.show(mainPanel, "menu");
+        });
+
+        JButton wrocButton = new JButton("Wróć");
+        wrocButton.addActionListener(e -> cardLayout.show(mainPanel, "menu"));
+
+        buttonPanel.add(zapiszButton);
+        buttonPanel.add(wrocButton);
+
+        panel.add(buttonPanel, BorderLayout.SOUTH);
+        return panel;
+    }
+
+    private JPanel wyswietlCalaKsiazkePanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        return panel;
+    }
+
+    private void pokazStartPanel() {
         JPanel nowyStartPanel = startPanel();  // generuj nowy panel z aktualnymi plikami
         mainPanel.add(nowyStartPanel, "start");
         cardLayout.show(mainPanel, "start");
+    }
+    private void pokazUsunWpisPanel() {
+        JPanel nowyStartPanel = usunWpisPanel();  // generuj nowy panel z aktualnymi plikami
+        mainPanel.add(nowyStartPanel, "usun wpis");
+        cardLayout.show(mainPanel, "usun wpis");
+    }
+    private void pokazPoprawWpisPanel() {
+        JPanel nowyStartPanel = poprawWpisPanel();  // generuj nowy panel z aktualnymi plikami
+        mainPanel.add(nowyStartPanel, "popraw wpis");
+        cardLayout.show(mainPanel, "popraw wpis");
+    }
+    private void pokazPoprawWybranyWpisPanel(int id) {
+        JPanel nowyStartPanel = poprawWybranyWpisPanel(id);  // generuj nowy panel z aktualnymi plikami
+        mainPanel.add(nowyStartPanel, "popraw wybrany wpis");
+        cardLayout.show(mainPanel, "popraw wybrany wpis");
     }
 
     public static void main(String[] args) {
